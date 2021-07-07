@@ -13,8 +13,6 @@ contract Reentrancy is Ownable {
     }
 
     function donate(address _to) public payable {
-        console.log(msg.sender);
-        console.log(msg.value);
         balances[_to] = balances[_to].add(msg.value);
     }
 
@@ -23,11 +21,10 @@ contract Reentrancy is Ownable {
     }
 
     function withdraw(uint _amount) public {
-        if(balances[msg.sender] >= _amount) {
-            (bool success, bytes memory data) = msg.sender.call{value:_amount}("");
-            if(success){
-                balances[msg.sender].sub(_amount);
-            }
+        require(balances[msg.sender] >= _amount, "Account does not have enough balance");
+        (bool success, bytes memory data) = msg.sender.call{value:_amount}("");
+        if(success){
+            balances[msg.sender] = balances[msg.sender].sub(_amount);
         }
     }
 
