@@ -87,7 +87,17 @@ describe("Reentracny", function () {
     }
   });
 
-  it("Only owner should be able to destroy the contract", async () => {
+  it.skip("Only owner should be able to destroy the contract", async () => {
+    let ex = {};
+    try {
+      await contract.kill(owner);
+      console.log(contract.address);
+    } catch (error) {
+      ex = error;
+    } finally {
+    }
+  });
+  it("Others should not be able to destroy the contract", async () => {
     let ex = {};
     try {
       const friend1Signer = await ethers.provider.getSigner(friend1);
@@ -100,11 +110,5 @@ describe("Reentracny", function () {
         "VM Exception while processing transaction: reverted with reason string 'Ownable: caller is not the owner'"
       );
     }
-    //fix this test part. Should test that contract is destructed.
-    // try {
-    //   await contract.kill(owner);
-    //   assert.equal(contract, null);
-    // } catch (error) {
-    // }
   });
 });
