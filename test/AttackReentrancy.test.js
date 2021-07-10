@@ -1,35 +1,69 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { assert } = require("chai");
-
-describe("AttackReentracny", function () {
-  let attackContract, depositAmount;
-  let vulnerableContract;
-  let owner;
-  beforeEach(async () => {
+const { BN, expectEvent, expectRevert } = require("@openzeppelin/test-helpers");
+describe("AttackReentrancy", function () {
+  before(async function () {
+    this.VulnerableReentrancy = await ethers.getContractFactory("Reentrancy");
+    this.FixedReentrancy = await ethers.getContractFactory("FixedReentrancy");
+    this.AttackReentrancy = await ethers.getContractFactory("AttackReentrancy");
+  });
+  beforeEach(async function () {
     [owner, friend1, friend2] = await ethers.provider.listAccounts();
-    depositAmount = ethers.utils.parseEther("10");
-    const Reentrance = await ethers.getContractFactory("Reentrancy");
-    vulnerableContract = await Reentrance.deploy({ value: depositAmount });
-    await vulnerableContract.deployed();
+    (this.owner = owner), (this.friend1 = friend1), (this.friend2 = friend2);
+    this.depositAmount = ethers.utils.parseEther("10");
+    this.vulnerableContract = await this.VulnerableReentrancy.deploy({
+      value: this.depositAmount,
+    });
+    await this.vulnerableContract.deployed();
 
-    const AttackReentrance = await ethers.getContractFactory(
-      "AttackReentrancy"
+    this.fixedContract = await this.FixedReentrancy.deploy({
+      value: this.depositAmount,
+    });
+    await this.fixedContract.deployed();
+
+    this.attackVulnerableContract = await this.AttackReentrancy.deploy(
+      this.vulnerableContract.address
     );
-    attackContract = await AttackReentrance.deploy(vulnerableContract.address);
-    await attackContract.deployed();
+    await this.attackVulnerableContract.deployed();
+
+    this.attackFixedContract = await this.AttackReentrancy.deploy(
+      this.fixedContract.address
+    );
+    await this.attackFixedContract.deployed();
   });
 
-  it("should be able to attack the vulnerable contract", async () => {
+  it("should be able to attack the vulnerable contract", async function () {
     const contractBalanceBefore = await ethers.provider.getBalance(
-      attackContract.address
+      this.attackVulnerableContract.address
     );
-    expect(contractBalanceBefore).to.equal(0);
+    expect(contractBalanceBefore).to.be.equal("0");
     const attackAmount = ethers.utils.parseEther("1");
-    await attackContract.attack({ value: attackAmount });
+    await this.attackVulnerableContract.attack({ value: attackAmount });
     const contractBalanceAfter = await ethers.provider.getBalance(
-      attackContract.address
+      this.attackVulnerableContract.address
     );
-    //add openzeppelin test helper
+    expect(Number(contractBalanceAfter)).to.be.greaterThan(
+      Number(attackAmount)
+    );
+  });
+  it("should fail to attack the fixed contract", async function () {
+    const contractBalanceBefore = await ethers.provider.getBalance(
+      this.attackFixedContract.address
+    );
+    expect(contractBalanceBefore).to.be.equal("0");
+    const attackAmount = ethers.utils.parseEther("1");
+
+    // if only check-effect-interaction pattern is used
+    // let expectedError = "Transaction failed.";
+
+    // if only transfer is used
+    // let expectedError = "contract call run out of gas and made the transaction revert";
+
+    // if mutex is used
+    let expectedError = "One transaction is already in process";
+
+    await expect(
+      this.attackFixedContract.attack({ value: attackAmount })
+    ).to.be.revertedWith(expectedError);
   });
 });
